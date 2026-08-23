@@ -1,0 +1,4 @@
+requests
+nba_api
+pandas
+pytest
