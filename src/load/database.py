@@ -4,17 +4,17 @@ from pathlib import Path
 CAMINHO_BANCO = Path("data") / "nba_warehouse.db"
 CAMINHO_SCHEMA = Path("sql") / "ddl" / "schema.sql"
 
-def criar_banco() -> None:
+def criar_banco(caminho_banco=CAMINHO_BANCO) -> None:
     with open(CAMINHO_SCHEMA, "r", encoding="utf-8") as f:
         schema_sql = f.read()
 
-    conexao = sqlite3.connect(CAMINHO_BANCO)
+    conexao = sqlite3.connect(caminho_banco)
     conexao.executescript(schema_sql)
     conexao.commit()
     conexao.close()
 
-def inserir_estatisticas(lista_estatisticas: list, df_elenco) -> None:
-    conexao = sqlite3.connect(CAMINHO_BANCO)
+def inserir_estatisticas(lista_estatisticas: list, df_elenco, caminho_banco=CAMINHO_BANCO) -> None:
+    conexao = sqlite3.connect(caminho_banco)
     cursor = conexao.cursor()
 
     # Monta um dicionário player_id -> nome, a partir do elenco
