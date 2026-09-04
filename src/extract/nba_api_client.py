@@ -36,4 +36,4 @@ def buscar_estatisticas_time(team_id: int) -> tuple[pd.DataFrame, list]:
             falhas.append(jogador["PLAYER"])
         time.sleep(1.0)
     df_final = pd.concat(lista_estatisticas, ignore_index=True)
-    return df_final, falhas    
+    return df_final, falhas
