@@ -1,61 +1,44 @@
 # NBA Data Warehouse
 
-Data warehouse de estatísticas da NBA, construído como projeto contínuo de portfólio em Engenharia de Dados, evoluindo de ingestão simples até uma arquitetura completa de dados — com destino planejado até Machine Learning.
+Pipeline ETL em Python que extrai estatísticas de temporada da API oficial da NBA, trata a qualidade dos dados e carrega em um warehouse SQLite com modelo dimensional. Projeto contínuo de portfólio em dados, evoluindo rumo a Machine Learning e MLOps.
 
-## Sobre o projeto
-
-Diferente de um exercício isolado, este projeto acompanha a trilha de aprendizado inteira: começa com ingestão de dado real via API oficial da NBA, evolui para um modelo dimensional de data warehouse, e está planejado para, nas próximas fases, ganhar orquestração (Airflow), containerização (Docker) e evoluir para uma arquitetura de lakehouse — servindo depois como base de dados para modelos de Machine Learning.
-
-## Por que NBA como domínio
-
-Dataset escolhido após comparação com outras opções (F1, League of Legends, MotoGP), com base em três critérios: qualidade e maturidade da API disponível (`nba_api`), reconhecimento do domínio por recrutadores técnicos, e disponibilidade de dados de temporada ativa, permitindo trabalhar com dado que muda de verdade, não uma fotografia estática.
-
-## Arquitetura
-
-O projeto segue uma separação por camada de pipeline, inspirada em arquiteturas ETL/ELT reais:
+## O que o projeto faz
 
 ```
-nba-data-warehouse/
-├── src/
-│   ├── extract/
-│   │   └── nba_api_client.py     # Busca dado bruto da API oficial da NBA
-│   ├── transform/
-│   │   └── limpeza.py             # Qualidade de dado: remoção de duplicatas, correção de tipos
-│   ├── models/
-│   │   └── estatistica_temporada.py  # Classes de domínio
-│   ├── load/                      # Carga no banco de dados (em construção)
-│   └── analytics/                 # Consultas e agregações (planejado)
-├── sql/
-│   ├── ddl/                       # Definição de schema (Star Schema)
-│   └── queries/                   # Consultas analíticas
-├── data/
-│   ├── raw/
-│   └── processed/
-├── docs/
-├── tests/
-├── requirements.txt
-└── pytest.ini
+nba_api → extract → transform → models → load → SQLite → analytics → dashboard
 ```
+
+| Camada | Arquivo | Responsabilidade |
+|---|---|---|
+| extract | `src/extract/nba_api_client.py` | Busca dados da API com retry, backoff e logging estruturado |
+| transform | `src/transform/limpeza.py` | Remove linhas `TOT` e corrige tipos numéricos |
+| models | `src/models/estatistica_temporada.py` | `@dataclass` do domínio + factory function |
+| load | `src/load/database.py` | Carga no SQLite, idempotente |
+| analytics | `src/analytics/consultas.py` | Consultas analíticas (rankings, totais por time) |
 
 ## Modelo de dados
 
-Modelagem dimensional em **Star Schema**, escolhida por otimizar leitura analítica (menos joins, consultas mais simples e rápidas) em troca de alguma redundância de dado — trade-off padrão em data warehouses, que priorizam consulta sobre economia de espaço.
+Modelo dimensional simples, com grão de temporada por jogador e time:
 
-- **`fato_estatisticas_jogo`** — tabela fato central
-- **`dim_jogador`** — modelada como **SCD Type 2**, preservando histórico de mudanças (ex.: trocas de time), em vez de sobrescrever o registro atual
-- **`dim_time`**, **`dim_jogo`**, **`dim_temporada`** — dimensões de suporte
+- `fato_estatisticas_temporada`: pontos, rebotes, assistências, roubos, bloqueios, minutos, jogos e idade, com `UNIQUE (player_id, team_id, season_id)`
+- `dim_jogador`: `player_id`, `nome`
+- `dim_time`: `team_id`, `sigla`
 
-## Decisões técnicas de destaque
+A dimensão de jogador é uma dimensão simples (sem histórico). Evoluí-la para SCD Type 2 está no roadmap.
 
-**Ingestão resiliente.** A API oficial da NBA (`stats.nba.com`) é conhecida por instabilidade de rede. A camada de extração implementa retry com backoff (até 3 tentativas por requisição, com espera entre elas) e timeout estendido, isolando falhas por jogador sem derrubar o processamento do lote inteiro.
+## Decisões técnicas
 
-**Tratamento de linhas de totalização.** A API devolve, para jogadores que trocam de time no meio da temporada, uma linha adicional com o total consolidado (`TEAM_ABBREVIATION == "TOT"`), junto às linhas individuais por time. Sem filtrar essa linha antes de agregações, qualquer soma de estatísticas fica silenciosamente duplicada. A camada de transformação detecta e remove essas linhas antes de qualquer cálculo.
+**Ingestão resiliente.** A API `stats.nba.com` é instável. A extração faz retry com backoff e isola falhas por jogador, sem derrubar o lote inteiro.
 
-**Correção de tipos.** A API devolve os dados com tipagem inconsistente internamente (colunas numéricas classificadas como `object` pelo pandas). A camada de transformação força a conversão explícita para tipos numéricos corretos, prevenindo bugs silenciosos em operações agregadas.
+**Linhas de totalização.** Para jogadores trocados de time no meio da temporada, a API devolve uma linha extra com o total (`TEAM_ABBREVIATION == "TOT"`). Sem removê-la, qualquer soma fica silenciosamente duplicada. A transformação remove essas linhas antes de qualquer agregação.
 
-## Como rodar o projeto
+**Carga idempotente.** A constraint `UNIQUE` combinada com `INSERT OR IGNORE` garante que reexecutar o pipeline não duplica registros.
 
-```bash
+**Consultas seguras.** Métricas escolhidas pela interface passam por uma lista fechada (`METRICAS_PERMITIDAS`), porque nome de coluna não pode ser parâmetro SQL e interpolação sem validação abre injeção de SQL. Há teste cobrindo isso.
+
+## Como rodar
+
+```powershell
 git clone https://github.com/WellitonT/nba-data-warehouse.git
 cd nba-data-warehouse
 
@@ -65,29 +48,41 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-## Rodando os testes
+## Testes
 
-```bash
+```powershell
 python -m pytest tests/ -v
 ```
 
+Os testes usam mock da API (sem rede) e um banco SQLite temporário isolado por teste.
+
+## Dashboard
+
+```powershell
+pip install -r requirements-dashboard.txt
+python -m streamlit run src/dashboard/app.py
+```
+
+Mostra rankings por temporada e métrica, totais por time e o estado do warehouse (linhas por tabela). Toda consulta fica em `src/analytics/consultas.py`; o dashboard só chama funções e desenha.
+
 ## Stack
 
-- Python 3.13
-- `nba_api` — cliente para a API oficial de estatísticas da NBA
-- `pandas` — tratamento e transformação de dados
-- `requests` — comunicação HTTP
-- `pytest` — testes automatizados
-- SQLite (planejado para a camada de carga)
+Python 3.13 · `nba_api` · pandas · requests · SQLite · pytest · Streamlit · Docker (Dockerfile inicial no repositório)
 
 ## Status
 
-**Concluído:** ingestão resiliente de estatísticas por temporada (com logging estruturado), tratamento de qualidade de dado (remoção de duplicatas, correção de tipos), modelagem inicial de domínio, testes automatizados para transformação e extração (com mock de chamadas de API, sem dependência de rede).
+**Concluído:** pipeline de quatro camadas (extract, transform, models, load), carga idempotente em SQLite, consultas analíticas e testes automatizados.
 
-**Em construção:** camada de carga no banco de dados (SQLite), criação das tabelas do modelo dimensional.
+**Em andamento:** dashboard analítico e containerização.
 
-**Planejado:** orquestração com Airflow, containerização com Docker, migração para armazenamento em cloud, evolução para arquitetura de lakehouse, e uso como base para modelos de Machine Learning.
+**Roadmap:** SCD Type 2 na dimensão de jogador, coluna de data de carga para observabilidade, orquestração, CI com GitHub Actions, deploy em cloud e uso como base para modelos de Machine Learning.
+
+## Limitações conhecidas
+
+- Grão de temporada: não há dados jogo a jogo.
+- Sem coluna de data de carga: não dá para auditar quando cada registro entrou no banco.
+- A API da NBA bloqueia IPs de datacenter com frequência, então o ETL roda localmente e não em ambiente cloud.
 
 ## Autor
 
-Welliton — projeto desenvolvido como parte de uma trilha autodidata em Engenharia de Dados, com trajetória planejada até Machine Learning e AI Engineering.
+Welliton ([LinkedIn](https://www.linkedin.com/in/welliton-tiene-336bb7207/)) · projeto de uma trilha autodidata em dados, rumo a MLOps.
