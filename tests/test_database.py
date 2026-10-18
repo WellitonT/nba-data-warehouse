@@ -1,14 +1,10 @@
-import os
 import pandas as pd
 from src.load.database import criar_banco, inserir_estatisticas
 from src.models.estatistica_temporada import EstatisticaTemporada
 import sqlite3
 
-def test_nao_duplica_ao_inserir_duas_vezes():
-    caminho_teste = "data/teste_banco.db"
-
-    if os.path.exists(caminho_teste):
-        os.remove(caminho_teste)
+def test_nao_duplica_ao_inserir_duas_vezes(tmp_path):
+    caminho_teste = tmp_path / "teste_banco.db"
 
     estatistica = EstatisticaTemporada(
         player_id="123", season_id="2025-26", team_id="997",
