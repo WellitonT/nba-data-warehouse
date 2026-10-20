@@ -39,13 +39,11 @@ A dimensão de jogador é uma dimensão simples (sem histórico). Evoluí-la par
 ## Como rodar
 
 ```powershell
-git clone https://github.com/WellitonT/nba-data-warehouse.git
-cd nba-data-warehouse
-
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-
 pip install -r requirements.txt
+python -m src.pipeline
+python -m streamlit run src/dashboard/app.py
 ```
 
 ## Testes
