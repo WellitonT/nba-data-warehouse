@@ -5,11 +5,13 @@ CAMINHO_BANCO = Path("data") / "nba_warehouse.db"
 CAMINHO_SCHEMA = Path("sql") / "ddl" / "schema.sql"
 
 def criar_banco(caminho_banco=CAMINHO_BANCO) -> None:
+    Path(caminho_banco).parent.mkdir(parents=True, exist_ok=True)
     with open(CAMINHO_SCHEMA, "r", encoding="utf-8") as f:
         schema_sql = f.read()
 
     conexao = sqlite3.connect(caminho_banco)
     conexao.executescript(schema_sql)
+    conexao.execute("PRAGMA foreign_keys = ON")
     conexao.commit()
     conexao.close()
 
