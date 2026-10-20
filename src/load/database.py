@@ -17,6 +17,7 @@ def criar_banco(caminho_banco=CAMINHO_BANCO) -> None:
 
 def inserir_estatisticas(lista_estatisticas: list, df_elenco, caminho_banco=CAMINHO_BANCO) -> None:
     conexao = sqlite3.connect(caminho_banco)
+    conexao.execute("PRAGMA foreign_keys = ON")
     cursor = conexao.cursor()
 
     # Monta um dicionário player_id -> nome, a partir do elenco
