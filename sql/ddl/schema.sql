@@ -1,17 +1,17 @@
 CREATE TABLE IF NOT EXISTS dim_jogador (
-    player_id TEXT PRIMARY KEY,
+    player_id INTEGER PRIMARY KEY,
     nome TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS dim_time (
-    team_id TEXT PRIMARY KEY,
+    team_id INTEGER PRIMARY KEY,
     sigla TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS fato_estatisticas_temporada (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    player_id TEXT NOT NULL,
-    team_id TEXT NOT NULL,
+    player_id INTEGER NOT NULL,
+    team_id INTEGER NOT NULL,
     season_id TEXT NOT NULL,
     idade REAL,
     jogos_disputados INTEGER,
