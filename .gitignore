@@ -14,7 +14,7 @@ env/
 data/raw/*
 data/processed/*
 data/*.db
-
+!data/nba_warehouse.db
 # Environment variables
 .env
 
